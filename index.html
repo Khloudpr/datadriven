@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyundai Connect PR | Sincronizador Remoto</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body { background: #002c5f; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh; display: flex; align-items: center; }
+        .container { background: white; color: #333; border-radius: 20px; padding: 40px; max-width: 700px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); }
+        .logo-area { text-align: center; margin-bottom: 30px; }
+        .drop-zone { border: 3px dashed #002c5f; padding: 40px; border-radius: 15px; text-align: center; cursor: pointer; transition: 0.3s; background: #f8f9fa; }
+        .drop-zone:hover { background: #e9ecef; border-color: #001a3a; }
+        .btn-hyundai { background: #002c5f; color: white; font-weight: bold; padding: 15px; border-radius: 10px; border: none; width: 100%; margin-top: 20px; }
+        .btn-hyundai:disabled { background: #ccc; }
+        #log { margin-top: 25px; font-family: 'Consolas', monospace; font-size: 13px; background: #1a1a1a; color: #00ff00; padding: 20px; border-radius: 10px; max-height: 350px; overflow-y: auto; display: none; border: 1px solid #444; }
+        .pass-field { margin-bottom: 20px; }
+        .spinner-border { width: 1.5rem; height: 1.5rem; margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="logo-area">
+        <h2 style="color: #002c5f; font-weight: 800;">HYUNDAI CONNECT PR</h2>
+        <p class="text-muted">Sincronización Multiusuario (Ventas y Visitas)</p>
+    </div>
+
+    <div class="pass-field">
+        <label class="form-label small fw-bold">Código de Acceso:</label>
+        <input type="password" id="passcode" class="form-control" placeholder="Ingrese clave para habilitar">
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+        <h5 id="statusText">Arrastra tu archivo CSV aquí</h5>
+        <p class="text-muted small">O haz clic para buscar en tu computadora</p>
+        <input type="file" id="fileInput" accept=".csv" style="display: none;">
+    </div>
+
+    <button class="btn-hyundai" id="syncBtn" disabled>
+        <span id="btnText">INICIAR SINCRONIZACIÓN</span>
+    </button>
+
+    <div id="loader" class="text-center mt-3" style="display: none;">
+        <div class="spinner-border text-primary" role="status"></div>
+        <span class="text-primary fw-bold">Procesando con Google Cloud...</span>
+    </div>
+
+    <div id="log"></div>
+</div>
+
+<script>
+    // ==========================================
+    // CONFIGURACIÓN - JOSE
+    // ==========================================
+    const GOOGLE_SCRIPT_URL = "PEGA_AQUI_TU_URL_DE_EJECUCUCION"; // <-- IMPORTANTE
+    const ACCESS_KEY = "Hyundai2026"; // Clave para usar la herramienta
+    
+    let csvData = [];
+    const syncBtn = document.getElementById('syncBtn');
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const log = document.getElementById('log');
+    const passcode = document.getElementById('passcode');
+
+    // Manejo de Archivos
+    dropZone.onclick = () => fileInput.click();
+
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target.result;
+            const firstLine = text.split('\n')[0];
+            const separator = firstLine.includes(';') ? ';' : ',';
+            
+            csvData = text.split(/\r?\n/)
+                        .filter(line => line.trim() !== "")
+                        .map(line => line.split(separator).map(cell => cell.replace(/^"|"$/g, '').trim()));
+            
+            document.getElementById('statusText').innerHTML = "✅ Archivo cargado: <br><small>" + file.name + "</small>";
+            syncBtn.disabled = false;
+        };
+        reader.readAsText(file);
+    };
+
+    // Lógica de Envío
+    syncBtn.onclick = async () => {
+        // Validar Clave
+        if (passcode.value !== ACCESS_KEY) {
+            alert("Código de acceso incorrecto.");
+            return;
+        }
+
+        syncBtn.disabled = true;
+        document.getElementById('loader').style.display = 'block';
+        log.style.display = 'block';
+        log.innerHTML = "Estableciendo conexión segura...<br>";
+
+        try {
+            // Usamos un Proxy de Google Apps Script vía POST
+            const response = await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // Necesario para Google Apps Script desde dominios externos
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ csvData: csvData })
+            });
+
+            // Nota: Al usar 'no-cors', no podemos leer la respuesta directamente por seguridad del navegador.
+            // Pero el script en Google se ejecutará. 
+            // Para ver resultados reales, lo ideal es que el script de
